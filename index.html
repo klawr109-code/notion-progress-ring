@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1"
+  />
+  <title>Notion Progress Ring</title>
+
+  <!-- Inter to match Notion headings -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#252525;
+      --text:#D4D4D4;
+      --card-radius:24px;
+      --size:500px;
+      --ring-thickness:10px;
+      --track:#3a3a3a; /* subtle track */
+    }
+    *{box-sizing:border-box}
+    html,body{
+      margin:0;
+      height:100%;
+      background:transparent; /* Notion shows the card */
+    }
+    .card{
+      width:var(--size);
+      height:var(--size);
+      background:var(--bg);
+      border-radius:var(--card-radius);
+      display:grid;
+      place-items:center;
+      position:relative;
+      overflow:hidden;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    /* ring container */
+    .ring-wrap{
+      width:80%;
+      height:80%;
+      position:relative;
+      display:grid;
+      place-items:center;
+    }
+    /* center label */
+    .center{
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      user-select:none;
+    }
+    .percent{
+      color:var(--text);
+      font-weight:700;
+      font-size:48px;             /* similar to Notion H1 in an embed */
+      letter-spacing:-0.02em;
+    }
+
+    /* buttons */
+    .controls{
+      position:absolute;
+      bottom:18px;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      gap:10px;
+    }
+    button{
+      background:#2f2f2f;
+      color:var(--text);
+      border:1px solid #3b3b3b;
+      border-radius:12px;
+      padding:10px 16px;
+      font-weight:600;
+      font-size:16px;
+      cursor:pointer;
+      transition:transform .06s ease, background .15s ease, border-color .15s ease;
+    }
+    button:hover{ background:#343434; border-color:#4a4a4a; }
+    button:active{ transform:translateY(1px) scale(0.98); }
+
+    /* accessibility: focus ring */
+    button:focus-visible{
+      outline:2px solid #16a34a;
+      outline-offset:2px;
+    }
+
+    /* subtle in-card hint at top */
+    .title{
+      position:absolute;
+      top:14px;
+      left:18px;
+      color:#a5a5a5;
+      font-size:12px;
+      font-weight:600;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+      opacity:.85;
+      user-select:none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card" role="application" aria-label="Course progress">
+    <div class="title">Overall Progress</div>
+    <div class="ring-wrap">
+      <svg id="ring" viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">
+        <!-- base track -->
+        <circle cx="50" cy="50" r="45"
+          fill="none"
+          stroke="var(--track)"
+          stroke-width="10"
+          stroke-linecap="round"
+        />
+        <!-- gradient definition -->
+        <defs>
+          <!-- gradient sweeps from start to end of arc -->
+          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <!-- green gradient; tweak if you like -->
+            <stop offset="0%" stop-color="#22c55e"/>
+            <stop offset="100%" stop-color="#16a34a"/>
+          </linearGradient>
+        </defs>
+        <!-- progress arc (we rotate -90deg so 0% starts at top) -->
+        <g transform="rotate(-90 50 50)">
+          <circle id="progressArc" cx="50" cy="50" r="45"
+            fill="none"
+            stroke="url(#grad)"
+            stroke-width="10"
+            stroke-linecap="round"
+            stroke-dasharray="0 999"
+            stroke-dashoffset="0"
+          />
+        </g>
+      </svg>
+
+      <div class="center">
+        <div class="percent" id="percentLabel">0%</div>
+      </div>
+    </div>
+
+    <div class="controls" aria-label="Progress controls">
+      <button id="decBtn" aria-label="Decrease progress by 1 percent">−</button>
+      <button id="incBtn" aria-label="Increase progress by 1 percent">+</button>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      // --- config & state ---
+      const url = new URL(window.location.href);
+      const widgetId = url.searchParams.get('id') || 'default';
+      const STORAGE_KEY = `progress-${widgetId}`;
+
+      // read persisted value or default to 0
+      let value = clamp(parseInt(localStorage.getItem(STORAGE_KEY) ?? '0', 10));
+
+      // elements
+      const arc = document.getElementById('progressArc');
+      const label = document.getElementById('percentLabel');
+      const incBtn = document.getElementById('incBtn');
+      const decBtn = document.getElementById('decBtn');
+
+      // geometry for the arc
+      const R = 45;                         // radius in SVG units
+      const C = 2 * Math.PI * R;            // circumference
+
+      // initialize stroke-dasharray to full circumference
+      arc.setAttribute('stroke-dasharray', `${C} ${C}`);
+
+      // animation settings
+      const ANIM_MS = 350;                  // duration for sweep animation
+
+      // draw initial (animated) state
+      updateUI(value, true);
+
+      // hook up controls
+      incBtn.addEventListener('click', () => setValue(value + 1));
+      decBtn.addEventListener('click', () => setValue(value - 1));
+
+      // keyboard support: left/right, -/+, PageUp/PageDown, Home/End
+      window.addEventListener('keydown', (e) => {
+        if (['ArrowRight','PageUp','+','=',']'].includes(e.key)) { e.preventDefault(); setValue(value + 1); }
+        if (['ArrowLeft','PageDown','-','['].includes(e.key))    { e.preventDefault(); setValue(value - 1); }
+        if (e.key === 'Home') { e.preventDefault(); setValue(0); }
+        if (e.key === 'End')  { e.preventDefault(); setValue(100); }
+      });
+
+      // --- functions ---
+      function clamp(n){ return Math.max(0, Math.min(100, isNaN(n) ? 0 : n)); }
+
+      function setValue(newVal){
+        newVal = clamp(newVal);
+        if (newVal === value) return;
+        const from = value;
+        const to = newVal;
+        value = newVal;
+        localStorage.setItem(STORAGE_KEY, String(value));
+        animateArc(from, to, ANIM_MS);
+      }
+
+      function updateUI(val, animate=false){
+        label.textContent = `${val}%`;
+        const offset = C * (1 - val/100);
+        if (!animate){
+          arc.style.transition = 'none';
+          arc.setAttribute('stroke-dashoffset', offset);
+          // force reflow to drop transition
+          void arc.getBoundingClientRect();
+        }
+        arc.style.transition = 'stroke-dashoffset ' + (animate ? ANIM_MS : 0) + 'ms ease';
+        arc.setAttribute('stroke-dashoffset', offset);
+      }
+
+      function animateArc(from, to, ms){
+        const start = performance.now();
+        function tick(now){
+          const t = Math.min(1, (now - start) / ms);
+          const eased = easeOutCubic(t);
+          const val = Math.round( from + (to - from) * eased );
+          label.textContent = `${val}%`;
+          const offset = C * (1 - val/100);
+          arc.setAttribute('stroke-dashoffset', offset);
+          if (t < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      }
+
+      function easeOutCubic(x){ return 1 - Math.pow(1 - x, 3); }
+    })();
+  </script>
+</body>
+</html>
