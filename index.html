@@ -9,12 +9,13 @@
 
   <style>
     :root{
-      --bg:#252525;
+      --bg:#30302E;          /* card background */
       --text:#D4D4D4;
       --card-radius:16px;
       --size:200px;
       --ring-thickness:8px;
       --track:#3a3a3a;
+      --ring-color:#263D30;  /* new green color */
     }
     *{box-sizing:border-box}
     html,body{
@@ -31,20 +32,18 @@
       flex-direction:column;
       align-items:center;
       justify-content:center;
-      gap:6px;               /* vertical spacing between ring and buttons */
-      padding:10px;          /* inner padding so nothing hugs the edges */
+      gap:6px;
+      padding:10px;
       overflow:hidden;
       font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
     }
-
-    /* ring area */
     .ring-wrap{
-      width:72%;             /* slightly smaller to create comfortable room */
+      width:72%;
       aspect-ratio:1/1;
       position:relative;
       display:grid;
       place-items:center;
-      margin-bottom:6px;     /* extra breathing room above the buttons */
+      margin-bottom:6px;
     }
     .center{
       position:absolute;
@@ -57,12 +56,10 @@
     .percent{
       color:var(--text);
       font-weight:700;
-      font-size:38px;        /* fills center without touching ring */
+      font-size:38px;
       letter-spacing:-0.02em;
       line-height:1;
     }
-
-    /* controls under the ring */
     .controls{
       display:flex;
       align-items:center;
@@ -85,9 +82,8 @@
     }
     button:hover{ background:#343434; border-color:#4a4a4a; }
     button:active{ transform:translateY(1px) scale(0.98); }
-    button:focus-visible{ outline:2px solid #16a34a; outline-offset:2px; }
+    button:focus-visible{ outline:2px solid var(--ring-color); outline-offset:2px; }
 
-    /* SVG track color via CSS var so theme remains consistent */
     .track{ stroke:var(--track); }
   </style>
 </head>
@@ -98,12 +94,12 @@
         <!-- base track -->
         <circle class="track" cx="50" cy="50" r="45.5" fill="none" stroke-width="8" stroke-linecap="round"/>
         <defs>
+          <!-- use same color for both ends for a solid fill -->
           <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#22c55e"/>
-            <stop offset="100%" stop-color="#16a34a"/>
+            <stop offset="0%" stop-color="var(--ring-color)"/>
+            <stop offset="100%" stop-color="var(--ring-color)"/>
           </linearGradient>
         </defs>
-        <!-- progress arc (rotated so 0% is at top) -->
         <g transform="rotate(-90 50 50)">
           <circle id="progressArc" cx="50" cy="50" r="45.5"
             fill="none"
@@ -138,7 +134,6 @@
       const incBtn = document.getElementById('incBtn');
       const decBtn = document.getElementById('decBtn');
 
-      // Geometry: r 45.5 keeps 8px stroke clear of the 100x100 viewBox edge
       const R = 45.5;
       const C = 2 * Math.PI * R;
       arc.setAttribute('stroke-dasharray', `${C} ${C}`);
@@ -149,7 +144,6 @@
       incBtn.addEventListener('click', () => setValue(value + 1));
       decBtn.addEventListener('click', () => setValue(value - 1));
 
-      // keyboard support remains
       window.addEventListener('keydown', (e) => {
         if (['ArrowRight','PageUp','+','=',']'].includes(e.key)) { e.preventDefault(); setValue(value + 1); }
         if (['ArrowLeft','PageDown','-','['].includes(e.key))    { e.preventDefault(); setValue(value - 1); }
